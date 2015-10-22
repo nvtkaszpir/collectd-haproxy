@@ -176,10 +176,7 @@ class HAProxyHttp(HAProxySocket):
         self.base_url = base_url
 
     def _get_data(self):
-        '''Get response from single command.
-
-        Args:
-            command: string command to send to haproxy stat socket
+        '''Get response from the stats api.
 
         Returns:
             a string of the response data
