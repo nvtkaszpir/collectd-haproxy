@@ -11,6 +11,7 @@
 import cStringIO as StringIO
 import socket
 import csv
+import urllib2
 
 import collectd
 
@@ -59,8 +60,10 @@ METRIC_TYPES = {
 METRIC_DELIM = '.'  # for the frontend/backend stats
 
 DEFAULT_SOCKET = '/var/lib/haproxy/stats'
+DEFAULT_BASE_URL = 'http://localhost/;csv'
 VERBOSE_LOGGING = False
 HAPROXY_SOCKET = None
+HAPROXY_URL = None
 
 
 class Logger(object):
@@ -110,9 +113,12 @@ class HAProxySocket(object):
         stat_sock.close()
         return result_buf.getvalue()
 
+    def get_server_info_data(self):
+        return self.communicate('show info')
+
     def get_server_info(self):
         result = {}
-        output = self.communicate('show info')
+        output = self.get_server_info_data()
         for line in output.splitlines():
             try:
                 key, val = line.split(':', 1)
@@ -121,8 +127,11 @@ class HAProxySocket(object):
             result[key.strip()] = val.strip()
         return result
 
+    def get_server_stats_data(self):
+        return self.communicate('show stats')
+
     def get_server_stats(self):
-        output = self.communicate('show stat')
+        output = self.get_server_stats_data()
         #sanitize and make a list of lines
         output = output.lstrip('# ').strip()
         output = [l.strip(',') for l in output.splitlines()]
@@ -130,51 +139,89 @@ class HAProxySocket(object):
         result = [d.copy() for d in csvreader]
         return result
 
+    def get_stats(self):
+        stats = {}
 
-def get_stats():
-    if HAPROXY_SOCKET is None:
-        return
-
-    stats = {}
-    haproxy = HAProxySocket(HAPROXY_SOCKET)
-
-    try:
-        server_info = haproxy.get_server_info()
-        server_stats = haproxy.get_server_stats()
-    except socket.error:
-        log.warning(
-            'status err Unable to connect to HAProxy socket at %s' %
-            HAPROXY_SOCKET)
-        return stats
-
-    for key, val in server_info.iteritems():
         try:
-            stats[key] = int(val)
-        except (TypeError, ValueError):
-            pass
+            server_info = self.get_server_info()
+            server_stats = self.get_server_stats()
+        except socket.error:
+            log.warning(
+                'status err Unable to connect to HAProxy socket at %s' %
+                HAPROXY_SOCKET)
+            return stats
 
-    ignored_svnames = set(['BACKEND'])
-    for statdict in server_stats:
-        if statdict['svname'] in ignored_svnames:
-            continue
-        for key, val in statdict.items():
-            metricname = METRIC_DELIM.join(
-                [statdict['svname'].lower(), statdict['pxname'].lower(), key])
+        for key, val in server_info.iteritems():
             try:
-                stats[metricname] = int(val)
+                stats[key] = int(val)
             except (TypeError, ValueError):
                 pass
-    return stats
+
+        ignored_svnames = set(['BACKEND'])
+        for statdict in server_stats:
+            if statdict['svname'] in ignored_svnames:
+                continue
+            for key, val in statdict.items():
+                metricname = METRIC_DELIM.join(
+                    [statdict['svname'].lower(), statdict['pxname'].lower(), key])
+                try:
+                    stats[metricname] = int(val)
+                except (TypeError, ValueError):
+                    pass
+        return stats
+
+
+class HAProxyHttp(HAProxySocket):
+    def __init__(self, base_url):
+        self.base_url = base_url
+
+    def _get_data(self):
+        '''Get response from single command.
+
+        Args:
+            command: string command to send to haproxy stat socket
+
+        Returns:
+            a string of the response data
+        '''
+
+        url = self.base_url + '/;csv'
+
+        try:
+            result = urllib2.urlopen(url, timeout=10).read()
+            return result
+        except urllib2.URLError, e:
+            collectd.error('mesos-slave plugin: Error connecting to %s - %r' % (url, e))
+            return None
+
+    def get_server_info_data(self):
+        # still figuring out if I can get server info via http
+        return ""
+
+    def get_server_stats_data(self):
+        return self._get_data()
+
+
+def get_stats():
+    # check for HAPROXY_URL first for backwards compat with HAPROXY_SOCKET
+    if HAPROXY_URL is not None:
+        return HAProxyHttp(HAPROXY_URL).get_stats()
+    elif HAPROXY_SOCKET is not None:
+        return HAProxySocket(HAPROXY_SOCKET).get_stats()
+    else:
+        return None
 
 
 def configure_callback(conf):
-    global HAPROXY_SOCKET, VERBOSE_LOGGING
+    global HAPROXY_SOCKET, HAPROXY_URL, VERBOSE_LOGGING
     HAPROXY_SOCKET = DEFAULT_SOCKET
     VERBOSE_LOGGING = False
 
     for node in conf.children:
         if node.key == "Socket":
             HAPROXY_SOCKET = node.values[0]
+        if node.key == "Url":
+            HAPROXY_URL = node.values[0]
         elif node.key == "Verbose":
             VERBOSE_LOGGING = bool(node.values[0])
         else:
@@ -192,12 +239,13 @@ def read_callback():
     for key, value in info.iteritems():
         key_prefix = ''
         key_root = key
-        if not value in METRIC_TYPES:
+        if value not in METRIC_TYPES:
             try:
                 key_prefix, key_root = key.rsplit(METRIC_DELIM, 1)
             except ValueError:
                 pass
-        if not key_root in METRIC_TYPES:
+
+        if key_root not in METRIC_TYPES:
             continue
 
         key_root, val_type = METRIC_TYPES[key_root]
@@ -211,6 +259,7 @@ def read_callback():
         val.values = [value]
         val.meta = {'bug_workaround': True}
         val.dispatch()
+
 
 collectd.register_config(configure_callback)
 collectd.register_read(read_callback)
