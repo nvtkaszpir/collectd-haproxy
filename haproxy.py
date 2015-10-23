@@ -64,6 +64,7 @@ DEFAULT_BASE_URL = 'http://localhost/;csv'
 VERBOSE_LOGGING = False
 HAPROXY_SOCKET = None
 HAPROXY_URL = None
+HAPROXY_INSTANCE = None
 
 
 class Logger(object):
@@ -210,15 +211,17 @@ def get_stats():
 
 
 def configure_callback(conf):
-    global HAPROXY_SOCKET, HAPROXY_URL, VERBOSE_LOGGING
+    global HAPROXY_SOCKET, HAPROXY_URL, HAPROXY_INSTANCE, VERBOSE_LOGGING
     HAPROXY_SOCKET = DEFAULT_SOCKET
     VERBOSE_LOGGING = False
 
     for node in conf.children:
         if node.key == "Socket":
             HAPROXY_SOCKET = node.values[0]
-        if node.key == "Url":
+        elif node.key == "Url":
             HAPROXY_URL = node.values[0]
+        elif node.key == "Instance":
+            HAPROXY_INSTANCE = node.values[0]
         elif node.key == "Verbose":
             VERBOSE_LOGGING = bool(node.values[0])
         else:
@@ -255,6 +258,11 @@ def read_callback():
         val.type_instance = key_name
         val.values = [value]
         val.meta = {'bug_workaround': True}
+
+        # only set plugin_instance if it is set for backwards compat
+        if HAPROXY_INSTANCE:
+            val.plugin_instance = HAPROXY_INSTANCE
+
         val.dispatch()
 
 
