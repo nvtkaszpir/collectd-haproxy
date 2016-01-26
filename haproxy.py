@@ -63,6 +63,10 @@ METRIC_TYPES = {
     'scur': ('session_current', 'gauge'),
     'wredis': ('redistributed', 'counter'),
     'wretr': ('retries', 'counter'),
+    'slim': ('session_limit', 'gauge'),
+    'wredis': ('redistributed', 'derive'),
+    'wretr': ('retries', 'derive'),
+}
 }
 
 METRIC_DELIM = '.'  # for the frontend/backend stats
