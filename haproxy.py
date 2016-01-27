@@ -58,6 +58,7 @@ METRIC_TYPES = {
     'rate': ('session_rate', 'gauge'),
     'req_rate': ('request_rate', 'gauge'),
     'stot': ('session_total', 'counter'),
+    'req_tot': ('request_total', 'derive'),
     'act': ('active_servers', 'gauge'),
     'bck': ('backup_servers', 'gauge'),
     'scur': ('session_current', 'gauge'),
