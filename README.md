@@ -1,17 +1,17 @@
 # collectd-haproxy
 
-This is a collectd plugin to pull HAProxy (<http://haproxy.1wt.eu>) stats from the HAProxy management socket.
+This is a [collectd](http://collectd.org/) plugin to pull [HAProxy](http://haproxy.1wt.eu) stats from the HAProxy management socket or via HTTP stats page.
 It is written in Python and as such, runs under the collectd Python plugin.
 
 # Requirements
 
+* HAProxy
+  To use this plugin, HAProxy must be configured to create a management socket with the `stats socket`
+  configuration option. collectd must have read/write access to the socket.
+  Optionally HAproxy section which allows accessing HAproxy stats via HTTP, see examples.
 
-*HAProxy*
-To use this plugin, HAProxy must be configured to create a management socket with the `stats socket`
-configuration option. collectd must have read/write access to the socket.
-
-*collectd*
-collectd must have the Python plugin installed. See (<http://collectd.org/documentation/manpages/collectd-python.5.shtml>)
+* collectd
+  collectd must have the Python plugin installed - [more info](http://collectd.org/documentation/manpages/collectd-python.5.shtml)
 
 # Options
 * `ProxyMonitor`
@@ -38,8 +38,8 @@ String in double quotes which represents HTTP Basic Auth User Password.
 
 Both Username and Password must be set if authorization is required
 
-# Known limitaions
-* Does not work with multiple instances yet (last value will overwrite other), so right now this script can monitor only one instance of the haproxy
+# Known limitations
+* Does not work with multiple instances yet (last value will overwrite other), so right now this script can monitor only one instance of the HAproxy
 * Python error and collectd plugin getting suspended when failed to fetch stats via HTTP
 * HTTPS was not tested.
 * Does not fetch HAproxy info via HTTP.
@@ -48,7 +48,7 @@ Both Username and Password must be set if authorization is required
 
 ## Via UNIX socket
 
-Connenct via UNIX socket:
+Connect via UNIX socket:
 
 ```text
 <LoadPlugin python>
