@@ -105,5 +105,5 @@ listen stats
     Username "stats_user"
     Password "stats_admin"
   </Module>
-
+</Plugin>
 ```
