@@ -8,10 +8,16 @@
 #
 # Modified by "Warren Turkal" <wt@signalfuse.com>
 
+# Known limitations:
+# - does not work witl multiple instances, the last on eoverwrite all other settings
+# - plugin python when failed to fetch remote stats
+# - not tested via https
+
 import cStringIO as StringIO
 import socket
 import csv
 import urllib2
+import base64
 
 import collectd
 
@@ -65,7 +71,10 @@ VERBOSE_LOGGING = False
 HAPROXY_SOCKET = None
 HAPROXY_URL = None
 HAPROXY_INSTANCE = None
-
+USERNAME = None
+PASSWORD = None
+REALM = "HAProxy Statistics"
+TIMEOUT = 2 # seconds
 
 class Logger(object):
     def error(self, msg):
@@ -184,12 +193,23 @@ class HAProxyHttp(HAProxySocket):
         '''
 
         url = self.base_url + '/;csv'
-
+        try_url = url + ", u:{}, p:{}".format(USERNAME, PASSWORD)
+        log.verbose('Trying url: {}'.format(try_url))
         try:
-            result = urllib2.urlopen(url, timeout=10).read()
-            return result
+            if USERNAME and PASSWORD:
+                auth_handler = urllib2.HTTPBasicAuthHandler()
+                auth_handler.add_password(
+                    realm=REALM,
+                    uri=url,
+                    user=USERNAME,
+                    passwd=PASSWORD)
+                opener = urllib2.build_opener(auth_handler)
+                urllib2.install_opener(opener)
+            request = urllib2.urlopen(url, timeout=TIMEOUT)
+            response = request.read()
+            return response
         except urllib2.URLError, e:
-            collectd.error('mesos-slave plugin: Error connecting to %s - %r' % (url, e))
+            collectd.error('haproxy plugin: Error connecting to %s - %s' % (try_url, e))
             return None
 
     def get_server_info_data(self):
@@ -211,7 +231,7 @@ def get_stats():
 
 
 def configure_callback(conf):
-    global HAPROXY_SOCKET, HAPROXY_URL, HAPROXY_INSTANCE, VERBOSE_LOGGING
+    global HAPROXY_SOCKET, HAPROXY_URL, HAPROXY_INSTANCE, VERBOSE_LOGGING, USERNAME, PASSWORD
     HAPROXY_SOCKET = DEFAULT_SOCKET
     VERBOSE_LOGGING = False
 
@@ -220,10 +240,18 @@ def configure_callback(conf):
             HAPROXY_SOCKET = node.values[0]
         elif node.key == "Url":
             HAPROXY_URL = node.values[0]
+        elif node.key == "Username":
+            USERNAME = node.values[0]
+        elif node.key == "Realm":
+            REALM = node.values[0]
+        elif node.key == "Password":
+            PASSWORD = node.values[0]
         elif node.key == "Instance":
             HAPROXY_INSTANCE = node.values[0]
         elif node.key == "Verbose":
             VERBOSE_LOGGING = bool(node.values[0])
+        elif node.key == "Timeout":
+            TIMEOUT = int(node.values[0])
         else:
             log.warning('Unknown config key: %s' % node.key)
 
