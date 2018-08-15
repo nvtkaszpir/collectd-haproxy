@@ -105,7 +105,8 @@ HAPROXY_INSTANCE = None
 USERNAME = None
 PASSWORD = None
 REALM = "HAProxy Statistics"
-TIMEOUT = 2 # seconds
+TIMEOUT = 2  # seconds
+
 
 class Logger(object):
     def error(self, msg):
@@ -120,6 +121,7 @@ class Logger(object):
     def verbose(self, msg):
         if VERBOSE_LOGGING:
             collectd.info('{name}: {msg}'.format(name=PLUGIN_NAME, msg=msg))
+
 
 log = Logger()
 
@@ -173,7 +175,7 @@ class HAProxySocket(object):
 
     def get_server_stats(self):
         output = self.get_server_stats_data()
-        #sanitize and make a list of lines
+        # sanitize and make a list of lines
         output = output.lstrip('# ').strip()
         output = [l.strip(',') for l in output.splitlines()]
         csvreader = csv.DictReader(output)
