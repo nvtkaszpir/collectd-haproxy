@@ -193,7 +193,7 @@ class HAProxyHttp(HAProxySocket):
         '''
 
         url = self.base_url + '/;csv'
-        try_url = url + ", u:{}, p:{}".format(USERNAME, PASSWORD)
+        try_url = url + ", u:{}, p:{}, r:{}".format(USERNAME, PASSWORD, REALM)
         log.verbose('Trying url: {}'.format(try_url))
         try:
             if USERNAME and PASSWORD:
@@ -231,7 +231,7 @@ def get_stats():
 
 
 def configure_callback(conf):
-    global HAPROXY_SOCKET, HAPROXY_URL, HAPROXY_INSTANCE, VERBOSE_LOGGING, USERNAME, PASSWORD
+    global HAPROXY_SOCKET, HAPROXY_URL, HAPROXY_INSTANCE, VERBOSE_LOGGING, USERNAME, PASSWORD, REALM
     HAPROXY_SOCKET = DEFAULT_SOCKET
     VERBOSE_LOGGING = False
 
